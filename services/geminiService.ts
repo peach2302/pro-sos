@@ -1,9 +1,18 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+/**
+ * ฟังก์ชันช่วยสร้าง Instance ของ AI อย่างปลอดภัย
+ * ป้องกันปัญหา ReferenceError: process is not defined ในบางสภาพแวดล้อม
+ */
+const getAIInstance = () => {
+  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+  return new GoogleGenAI({ apiKey: apiKey || '' });
+};
 
 export async function analyzeIncident(description: string, mediaBase64?: string, mediaMimeType?: string) {
   try {
+    const ai = getAIInstance();
     const parts: any[] = [
       { 
         text: `คุณคือ AI ผู้ช่วยวิเคราะห์เหตุฉุกเฉินสำหรับศูนย์รับแจ้งเหตุ อบต.หนองทุ่ม
