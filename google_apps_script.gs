@@ -1,24 +1,24 @@
 
 /**
- * API สำหรับระบบรับแจ้งเหตุ อบต.หนองทุ่ม
- * รับข้อมูลจาก Frontend เพื่อบันทึกลง Google Sheets และ Google Drive
+ * API สำหรับระบบรับแจ้งเหตุ อบต.หนองทุ่ม (V2 - Stable)
+ * วิธีใช้:
+ * 1. นำโค้ดนี้ไปวางใน Google Apps Script
+ * 2. กด Deploy > New Deployment > Web App
+ * 3. เลือก Execute as "Me" และ Who has access "Anyone"
+ * 4. นำ URL ที่ได้ไปใส่ใน WEB_APP_URL ของไฟล์ googleIntegration.ts
  */
 
 function doPost(e) {
   try {
     const requestData = JSON.parse(e.postData.contents);
-    const action = requestData.action;
-    const sheetId = requestData.sheetId;
-    const folderId = requestData.folderId;
-    const data = requestData.data;
+    const { action, sheetId, folderId, data } = requestData;
     const ss = SpreadsheetApp.openById(sheetId);
     
-    // 1. จัดการการแจ้งเหตุใหม่
+    // --- 1. รับแจ้งเหตุใหม่ ---
     if (action === "new_report") {
-      let sheet = ss.getSheetByName("ผู้แจ้ง");
-      if (!sheet) {
-        sheet = ss.insertSheet("ผู้แจ้ง");
-        sheet.appendRow(["วันที่-เวลา", "รหัสเหตุการณ์", "ประเภท", "รายละเอียด", "ชื่อผู้แจ้ง", "เบอร์โทร", "ที่อยู่/พิกัด", "Lat", "Lng", "ลิงก์รูปภาพ"]);
+      let sheet = ss.getSheetByName("ผู้แจ้ง") || ss.insertSheet("ผู้แจ้ง");
+      if (sheet.getLastRow() === 0) {
+        sheet.appendRow(["วันที่-เวลา", "รหัสเหตุการณ์", "ประเภท", "รายละเอียด", "ชื่อผู้แจ้ง", "เบอร์โทร", "พิกัด", "Lat", "Lng", "ลิงก์รูปภาพ"]);
       }
       
       let mediaUrl = "";
@@ -32,7 +32,7 @@ function doPost(e) {
         data.type,
         data.description,
         data.reporter,
-        "'" + data.phone, // ใส่ ' เพื่อป้องกัน Google Sheet ตัดเลข 0 ตัวหน้า
+        "'" + data.phone,
         data.address,
         data.lat,
         data.lng,
@@ -42,23 +42,15 @@ function doPost(e) {
       return createResponse("Success");
     }
     
-    // 2. อัปเดตสถานะและปิดงานโดยเจ้าหน้าที่
+    // --- 2. อัปเดตสถานะโดยเจ้าหน้าที่ ---
     else if (action === "update_status") {
-      let officerSheet = ss.getSheetByName("เจ้าหน้าที่");
-      if (!officerSheet) {
-        officerSheet = ss.insertSheet("เจ้าหน้าที่");
+      let officerSheet = ss.getSheetByName("เจ้าหน้าที่") || ss.insertSheet("เจ้าหน้าที่");
+      if (officerSheet.getLastRow() === 0) {
         officerSheet.appendRow(["วันที่-เวลา", "รหัสเหตุการณ์", "สถานะ", "ชื่อเจ้าหน้าที่", "ตำแหน่ง", "รูปปิดงาน", "ลายเซ็น"]);
       }
 
-      let closingMediaUrl = "";
-      if (data.closingMediaData && data.closingMediaData.includes("base64")) {
-        closingMediaUrl = saveFileToDrive(data.closingMediaData, folderId, "RESOLVED_" + data.id);
-      }
-
-      let signatureUrl = "";
-      if (data.signatureData && data.signatureData.includes("base64")) {
-        signatureUrl = saveFileToDrive(data.signatureData, folderId, "SIG_" + data.id);
-      }
+      let closingMediaUrl = data.closingMediaData ? saveFileToDrive(data.closingMediaData, folderId, "RESOLVED_" + data.id) : "";
+      let signatureUrl = data.signatureData ? saveFileToDrive(data.signatureData, folderId, "SIG_" + data.id) : "";
 
       officerSheet.appendRow([
         new Date().toLocaleString('th-TH'),
@@ -70,7 +62,7 @@ function doPost(e) {
         signatureUrl
       ]);
       
-      return createResponse("Status Updated Successfully");
+      return createResponse("Updated Successfully");
     }
     
   } catch (error) {
@@ -78,9 +70,6 @@ function doPost(e) {
   }
 }
 
-/**
- * ฟังก์ชันบันทึกไฟล์ Base64 ลงใน Google Drive
- */
 function saveFileToDrive(base64Data, folderId, fileName) {
   try {
     const folder = DriveApp.getFolderById(folderId);
@@ -88,15 +77,11 @@ function saveFileToDrive(base64Data, folderId, fileName) {
     const bytes = Utilities.base64Decode(base64Data.split(',')[1]);
     const blob = Utilities.newBlob(bytes, contentType, fileName);
     const file = folder.createFile(blob);
-    
-    // ตั้งค่าให้ทุกคนที่มีลิงก์สามารถดูรูปได้ (เพื่อให้เจ้าหน้าที่เปิดดูได้ทันที)
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     return file.getUrl();
-  } catch (e) {
-    return "Error saving file: " + e.toString();
-  }
+  } catch (e) { return "Error: " + e.toString(); }
 }
 
-function createResponse(message) {
-  return ContentService.createTextOutput(message).setMimeType(ContentService.MimeType.TEXT);
+function createResponse(msg) {
+  return ContentService.createTextOutput(msg).setMimeType(ContentService.MimeType.TEXT);
 }

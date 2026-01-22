@@ -2,13 +2,14 @@
 {
   "name": "nongthum-rescue-system",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite"
+    "start": "vite",
+    "serve": "vite preview"
   },
   "dependencies": {
     "@google/genai": "^1.37.0",
