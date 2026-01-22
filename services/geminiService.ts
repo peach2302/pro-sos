@@ -3,15 +3,16 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 /**
  * ฟังก์ชันดึง AI Instance อย่างปลอดภัย
- * รองรับการดึงค่าจาก Environment Variables ทั้งบน Render และ Netlify
  */
 const getAIInstance = () => {
-  const apiKey = (import.meta as any).env?.VITE_API_KEY || 
-                 (typeof process !== 'undefined' ? process.env.API_KEY : '') || 
-                 (window as any).API_KEY;
+  // ดึงค่า Key จาก process.env ที่เรา define ไว้ใน vite.config.ts 
+  // หรือลองดึงจาก VITE_ API variable หากมีการตั้งค่าไว้
+  const apiKey = (process.env.API_KEY) || 
+                 ((import.meta as any).env?.VITE_API_KEY) || 
+                 ((window as any).API_KEY);
                  
   if (!apiKey) {
-    console.warn("Missing Gemini API Key. Please set API_KEY in your deployment settings.");
+    console.error("Critical: Missing Gemini API Key. Ensure API_KEY is set in Render Environment Variables.");
   }
   
   return new GoogleGenAI({ apiKey: apiKey || '' });
@@ -33,7 +34,6 @@ export async function analyzeIncident(description: string, mediaBase64?: string,
     ];
     
     if (mediaBase64 && mediaMimeType && mediaMimeType.startsWith('image/')) {
-      // ตัดส่วนหัว data:image/jpeg;base64, ออกเพื่อให้ Gemini ประมวลผลได้
       const base64Data = mediaBase64.includes(',') ? mediaBase64.split(',')[1] : mediaBase64;
       parts.push({
         inlineData: {
