@@ -1,26 +1,12 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-/**
- * ฟังก์ชันดึง AI Instance อย่างปลอดภัย
- */
-const getAIInstance = () => {
-  // ดึงค่า Key จาก process.env ที่เรา define ไว้ใน vite.config.ts 
-  // หรือลองดึงจาก VITE_ API variable หากมีการตั้งค่าไว้
-  const apiKey = (process.env.API_KEY) || 
-                 ((import.meta as any).env?.VITE_API_KEY) || 
-                 ((window as any).API_KEY);
-                 
-  if (!apiKey) {
-    console.error("Critical: Missing Gemini API Key. Ensure API_KEY is set in Render Environment Variables.");
-  }
-  
-  return new GoogleGenAI({ apiKey: apiKey || '' });
-};
+// กำหนดค่าเริ่มต้นของ AI Instance โดยใช้ API_KEY จาก environment variable
+// ซึ่งจะถูกแทนที่ค่าจริงในขั้นตอนการ Build โดย Vite
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
 export async function analyzeIncident(description: string, mediaBase64?: string, mediaMimeType?: string) {
   try {
-    const ai = getAIInstance();
     const parts: any[] = [
       { 
         text: `คุณคือ AI ผู้ช่วยวิเคราะห์เหตุฉุกเฉินสำหรับศูนย์รับแจ้งเหตุ อบต.หนองทุ่ม
