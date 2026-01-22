@@ -2,11 +2,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 /**
- * ฟังก์ชันช่วยสร้าง Instance ของ AI อย่างปลอดภัย
- * ป้องกันปัญหา ReferenceError: process is not defined ในบางสภาพแวดล้อม
+ * ฟังก์ชันดึง AI Instance อย่างปลอดภัย
+ * รองรับการดึงค่าจาก Environment Variables ทั้งบน Render และ Netlify
  */
 const getAIInstance = () => {
-  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+  const apiKey = (import.meta as any).env?.VITE_API_KEY || 
+                 (typeof process !== 'undefined' ? process.env.API_KEY : '') || 
+                 (window as any).API_KEY;
+                 
+  if (!apiKey) {
+    console.warn("Missing Gemini API Key. Please set API_KEY in your deployment settings.");
+  }
+  
   return new GoogleGenAI({ apiKey: apiKey || '' });
 };
 
@@ -26,9 +33,11 @@ export async function analyzeIncident(description: string, mediaBase64?: string,
     ];
     
     if (mediaBase64 && mediaMimeType && mediaMimeType.startsWith('image/')) {
+      // ตัดส่วนหัว data:image/jpeg;base64, ออกเพื่อให้ Gemini ประมวลผลได้
+      const base64Data = mediaBase64.includes(',') ? mediaBase64.split(',')[1] : mediaBase64;
       parts.push({
         inlineData: {
-          data: mediaBase64.split(',')[1] || mediaBase64,
+          data: base64Data,
           mimeType: mediaMimeType,
         },
       });
@@ -42,18 +51,9 @@ export async function analyzeIncident(description: string, mediaBase64?: string,
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            severity: { 
-              type: Type.STRING, 
-              description: "ระดับความรุนแรง: LOW, MEDIUM, HIGH, CRITICAL" 
-            },
-            summary: { 
-              type: Type.STRING,
-              description: "สรุปเหตุการณ์ภาษาไทย"
-            },
-            advice: {
-              type: Type.STRING,
-              description: "คำแนะนำเบื้องต้นสั้นๆ สำหรับผู้แจ้งเหตุ"
-            }
+            severity: { type: Type.STRING },
+            summary: { type: Type.STRING },
+            advice: { type: Type.STRING }
           },
           required: ["severity", "summary", "advice"],
         },
